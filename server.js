@@ -1,5 +1,5 @@
 require('dotenv').config(); // Load environment variables from .env
-process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";  // For testing only; remove in production
+ // For testing only; remove in production
 
 const express = require('express');
 const multer = require('multer');
