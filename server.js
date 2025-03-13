@@ -1,5 +1,5 @@
 require('dotenv').config(); // Load environment variables from .env
- // For testing only; remove in production
+process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";  // For testing only; remove in production
 
 const express = require('express');
 const multer = require('multer');
@@ -9,7 +9,6 @@ const AWS = require('aws-sdk');
 const mongoose = require('mongoose');
 const path = require('path');
 
-// Initialize Express app
 const app = express();
 app.use(cors());
 
@@ -24,17 +23,22 @@ if (!fs.existsSync(uploadDir)) {
 // Configure Multer to store files temporarily in the uploads folder
 const upload = multer({ dest: uploadDir + '/' });
 
-// Configure AWS SDK to use Cloudflare R2
-const R2CONFIG = {
-    accessKeyId: process.env.R2_ACCESS_KEY_ID,
-    secretAccessKey: process.env.R2_SECRET_ACCESS_KEY,
-    endpoint: process.env.R2_ENDPOINT, // Ensure this URL is correct for your R2 bucket
-    apiVersion: 'latest',
-    region: 'auto',
-    signatureVersion: 'v3'
-};
-AWS.config.update(R2CONFIG);
-const s3 = new AWS.S3();
+// (Optional) Log environment variables to verify they are loaded in Railway
+console.log("R2_ACCESS_KEY_ID:", process.env.R2_ACCESS_KEY_ID);
+console.log("R2_SECRET_ACCESS_KEY:", process.env.R2_SECRET_ACCESS_KEY);
+console.log("R2_ENDPOINT:", process.env.R2_ENDPOINT);
+
+// Create an AWS.S3 instance with explicit credentials
+const s3 = new AWS.S3({
+  credentials: new AWS.Credentials(
+      process.env.R2_ACCESS_KEY_ID,
+      process.env.R2_SECRET_ACCESS_KEY
+  ),
+  endpoint: process.env.R2_ENDPOINT, // Ensure this endpoint is correct for your R2 bucket
+  apiVersion: 'latest',
+  region: 'auto',
+  signatureVersion: 'v4' // Cloudflare R2 requires signature v4
+});
 
 // Connect to MongoDB
 mongoose.connect(process.env.MONGODB_URL, {
@@ -60,7 +64,7 @@ async function uploadFileToR2(fileName, localFilePath) {
     if (fileStats.size < 5242880) { // For files smaller than 5MB
         const fileContent = fs.readFileSync(localFilePath);
         const params = {
-            Bucket: "logcapture", // Updated bucket name
+            Bucket: "logcapture", // Bucket name updated to "logcapture"
             Key: fileName,
             Body: fileContent,
         };
@@ -74,7 +78,7 @@ async function uploadFileToR2(fileName, localFilePath) {
         }
     } else { // For larger files, stream the content
         const params = {
-            Bucket: "logcapture", // Updated bucket name
+            Bucket: "logcapture", // Bucket name updated to "logcapture"
             Key: fileName,
             Body: fs.createReadStream(localFilePath),
         };
@@ -89,13 +93,13 @@ async function uploadFileToR2(fileName, localFilePath) {
     }
 }
 
-// Function to save file content to MongoDB
+// Function to save file content to MongoDB and then remove the local file
 async function saveFileToMongo(fileName, localFilePath) {
     try {
         const fileContent = fs.readFileSync(localFilePath);
         const newFile = new File({
             filename: fileName,
-            contentType: 'application/octet-stream', // Adjust if you want to store the actual MIME type
+            contentType: 'application/octet-stream', // Adjust if you want the actual MIME type
             fileData: fileContent,
         });
         const savedFile = await newFile.save();
@@ -105,12 +109,11 @@ async function saveFileToMongo(fileName, localFilePath) {
         console.error('Error saving to MongoDB:', error);
         throw error;
     } finally {
-        // Remove the local file after processing
         fs.unlinkSync(localFilePath);
     }
 }
 
-// A simple root endpoint
+// A simple root endpoint to verify the server is running
 app.get('/', (req, res) => {
     res.json({ message: "Server started" });
 });
