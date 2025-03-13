@@ -1,6 +1,6 @@
-// index.js
 require('dotenv').config(); // Load environment variables from .env
-process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
+process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";  // For testing only; remove in production
+
 const express = require('express');
 const multer = require('multer');
 const cors = require('cors');
@@ -28,7 +28,7 @@ const upload = multer({ dest: uploadDir + '/' });
 const R2CONFIG = {
     accessKeyId: process.env.R2_ACCESS_KEY_ID,
     secretAccessKey: process.env.R2_SECRET_ACCESS_KEY,
-    endpoint: process.env.R2_ENDPOINT, // Should include the bucket name as a part of the URL if required
+    endpoint: process.env.R2_ENDPOINT, // Ensure this URL is correct for your R2 bucket
     apiVersion: 'latest',
     region: 'auto',
     signatureVersion: 'v3'
@@ -60,14 +60,13 @@ async function uploadFileToR2(fileName, localFilePath) {
     if (fileStats.size < 5242880) { // For files smaller than 5MB
         const fileContent = fs.readFileSync(localFilePath);
         const params = {
-            Bucket: "logcapture", // Change this if your bucket name is different
+            Bucket: "logcapture", // Updated bucket name
             Key: fileName,
             Body: fileContent,
         };
         try {
             const data = await s3.putObject(params).promise();
-            console.log('File uploaded mongo + cloudflare');
-           
+            console.log('File uploaded to R2 (small file):', data);
             return data;
         } catch (err) {
             console.error('Error uploading small file:', err);
@@ -75,13 +74,13 @@ async function uploadFileToR2(fileName, localFilePath) {
         }
     } else { // For larger files, stream the content
         const params = {
-            Bucket: "logcapture",
+            Bucket: "logcapture", // Updated bucket name
             Key: fileName,
             Body: fs.createReadStream(localFilePath),
         };
         try {
             const data = await s3.upload(params).promise();
-            console.log('File uploaded (large file):');
+            console.log('File uploaded to R2 (large file):', data);
             return data;
         } catch (err) {
             console.error('Error uploading large file:', err);
@@ -96,7 +95,7 @@ async function saveFileToMongo(fileName, localFilePath) {
         const fileContent = fs.readFileSync(localFilePath);
         const newFile = new File({
             filename: fileName,
-            contentType: 'application/octet-stream', // Adjust if you want to save the correct MIME type
+            contentType: 'application/octet-stream', // Adjust if you want to store the actual MIME type
             fileData: fileContent,
         });
         const savedFile = await newFile.save();
@@ -113,7 +112,7 @@ async function saveFileToMongo(fileName, localFilePath) {
 
 // A simple root endpoint
 app.get('/', (req, res) => {
-    res.json({ message: "server started" });
+    res.json({ message: "Server started" });
 });
 
 // Upload endpoint
@@ -123,13 +122,13 @@ app.post('/upload', upload.single('file'), async (req, res) => {
     }
     console.log('File uploaded locally:', req.file);
     try {
-        // Upload to Cloudflare R2
+        // Upload file to Cloudflare R2
         await uploadFileToR2(req.file.originalname, req.file.path);
         // Save file copy to MongoDB
         await saveFileToMongo(req.file.originalname, req.file.path);
-        res.send('File uploaded successfully to MongoDB and cloudflare');
+        res.send('File uploaded successfully to MongoDB and Cloudflare R2');
     } catch (error) {
-        res.status(500).send('Error uploading to MongoDB');
+        res.status(500).send('Error uploading file');
     }
 });
 
