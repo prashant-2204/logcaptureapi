@@ -56,7 +56,7 @@ const File = mongoose.model('File', fileSchema);
 async function uploadFileToR2(fileName, localFilePath) {
     const fileStats = fs.statSync(localFilePath);
 
-    if (fileStats.size < 5242880) { // For files smaller than 5MB
+    if (fileStats.size < 20242880) { // For files smaller than 5MB
         const fileContent = fs.readFileSync(localFilePath);
         const params = {
             Bucket: "logcapture", // Change this if your bucket name is different
