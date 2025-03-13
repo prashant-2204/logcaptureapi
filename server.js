@@ -24,19 +24,7 @@ if (!fs.existsSync(uploadDir)) {
 const upload = multer({ dest: uploadDir + '/' });
 
 // (Optional) Log environment variables to verify they are loaded (remove sensitive logging in production)
-console.log("R2_ACCESS_KEY_ID:", process.env.R2_ACCESS_KEY_ID);
-console.log("R2_SECRET_ACCESS_KEY:", process.env.R2_SECRET_ACCESS_KEY);
-console.log("R2_ENDPOINT:", process.env.R2_ENDPOINT);
-console.log("R2_ENDPOINT:", process.env.MONGODB_URL);
 
-// Defensive check for credentials
-const accessKeyId = process.env.R2_ACCESS_KEY_ID;
-const secretAccessKey = process.env.R2_SECRET_ACCESS_KEY;
-const endpoint = process.env.R2_ENDPOINT;
-
-if (!accessKeyId || !secretAccessKey || !endpoint) {
-    throw new Error("Missing required environment variables for R2 credentials.");
-}
 
 // Create an AWS.S3 instance with explicit credentials
 const s3 = new AWS.S3({
