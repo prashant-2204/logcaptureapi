@@ -1,4 +1,4 @@
-require('dotenv').config(); // Load environment variables from .env
+require('dotenv').config(); // Load environment variables from .env (works locally)
 process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";  // For testing only; remove in production
 
 const express = require('express');
@@ -23,18 +23,24 @@ if (!fs.existsSync(uploadDir)) {
 // Configure Multer to store files temporarily in the uploads folder
 const upload = multer({ dest: uploadDir + '/' });
 
-// (Optional) Log environment variables to verify they are loaded in Railway
+// (Optional) Log environment variables to verify they are loaded (remove sensitive logging in production)
 console.log("R2_ACCESS_KEY_ID:", process.env.R2_ACCESS_KEY_ID);
 console.log("R2_SECRET_ACCESS_KEY:", process.env.R2_SECRET_ACCESS_KEY);
 console.log("R2_ENDPOINT:", process.env.R2_ENDPOINT);
 
+// Defensive check for credentials
+const accessKeyId = process.env.R2_ACCESS_KEY_ID;
+const secretAccessKey = process.env.R2_SECRET_ACCESS_KEY;
+const endpoint = process.env.R2_ENDPOINT;
+
+if (!accessKeyId || !secretAccessKey || !endpoint) {
+    throw new Error("Missing required environment variables for R2 credentials.");
+}
+
 // Create an AWS.S3 instance with explicit credentials
 const s3 = new AWS.S3({
-  credentials: new AWS.Credentials(
-      process.env.R2_ACCESS_KEY_ID,
-      process.env.R2_SECRET_ACCESS_KEY
-  ),
-  endpoint: process.env.R2_ENDPOINT, // Ensure this endpoint is correct for your R2 bucket
+  credentials: new AWS.Credentials(accessKeyId, secretAccessKey),
+  endpoint: endpoint, // Ensure this endpoint is correct for your R2 bucket
   apiVersion: 'latest',
   region: 'auto',
   signatureVersion: 'v4' // Cloudflare R2 requires signature v4
@@ -64,7 +70,7 @@ async function uploadFileToR2(fileName, localFilePath) {
     if (fileStats.size < 5242880) { // For files smaller than 5MB
         const fileContent = fs.readFileSync(localFilePath);
         const params = {
-            Bucket: "logcapture", // Bucket name updated to "logcapture"
+            Bucket: "logcapture", // Updated bucket name
             Key: fileName,
             Body: fileContent,
         };
@@ -78,7 +84,7 @@ async function uploadFileToR2(fileName, localFilePath) {
         }
     } else { // For larger files, stream the content
         const params = {
-            Bucket: "logcapture", // Bucket name updated to "logcapture"
+            Bucket: "logcapture", // Updated bucket name
             Key: fileName,
             Body: fs.createReadStream(localFilePath),
         };
